@@ -4,11 +4,12 @@
 package wsman
 
 import (
-	"fmt"
-	"github.com/VictorLowther/soap"
 	"crypto/tls"
+	"fmt"
+	"github.com/VictorLowther/simplexml/dom"
+	"github.com/VictorLowther/soap"
+	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -18,15 +19,8 @@ type Client struct {
 	target, username, password string
 }
 
-const identifyDoc = `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
-xmlns:wsmid="http://schemas.dmtf.org/wbem/wsman/identity/1/wsmanidentity.xsd">
- <s:Header/>
- <s:Body>
-  <wsmid:Identify/>
- </s:Body>
-</s:Envelope>`
-
 // NewClient creates a new wsman.Client.
+//
 // target must be a URL, and username and password must be
 // the username and password to authenticate to the controller with.
 // If username or password are empty, we will not try to authenticate.
@@ -58,7 +52,8 @@ func (c *Client) post(msg *soap.Message) (response *soap.Message, err error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 400 {
-		return nil, fmt.Errorf("wsman.Client: post recieved %v", res.Status)
+		b, _ := ioutil.ReadAll(res.Body)
+		return nil, fmt.Errorf("wsman.Client: post recieved %v\n'%v'", res.Status, string(b))
 	}
 	response, err = soap.Parse(res.Body)
 	if err != nil {
@@ -70,10 +65,9 @@ func (c *Client) post(msg *soap.Message) (response *soap.Message, err error) {
 // Identify performs a basic WSMAN IDENTIFY call.
 // The response will provide the version of WSMAN the endpoint
 // speaks, along with some details about the WSMAN endpoint itself.
+// Note that identify uses soap.Message directly instead of wsman.Message.
 func (c *Client) Identify() (*soap.Message, error) {
-	message, err := soap.Parse(strings.NewReader(identifyDoc))
-	if err != nil {
-		panic(err)
-	}
+	message := soap.NewMessage()
+	message.SetBody(dom.Elem("Identify", NS_WSMID))
 	return c.post(message)
 }
