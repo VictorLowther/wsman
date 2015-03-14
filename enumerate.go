@@ -49,8 +49,7 @@ func enumHelper(firstreq, resp *Message) error {
 // for the appropriate series of wsman Pull calls to be performed, so you can
 // be certian that the response to this message has all the objects you specify.
 func (client *Client) Enumerate(resource string) *Message {
-	req := client.NewMessage(ENUMERATE)
-	req.SetHeader(Resource(resource))
+	req := client.NewMessage(ENUMERATE).ResourceURI(resource)
 	body := dom.Elem("Enumerate", NS_WSMEN)
 	req.SetBody(body)
 	optimizeEnum := dom.Elem("OptimizeEnumeration", NS_WSMAN)

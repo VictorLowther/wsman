@@ -108,6 +108,11 @@ func (m *Message) Options(opts ...string) *Message {
 	return m
 }
 
+func (m *Message) ResourceURI(resource string) *Message {
+	m.SetHeader(Resource(resource))
+	return m
+}
+
 // Selectors are used to target the resource that Get, Put, and Invoke
 // should work with.  They work like Options does, except they add a SelectorSet
 // element with Selectors instead of Options.
@@ -157,7 +162,7 @@ func (m *Message) Parameters(args ...string) *Message {
 // constructed with, and returns either the Message that was
 // returned, or an error statung what went wrong.
 func (m *Message) Send() (*Message, error) {
-	res, err := m.client.post(m.Message)
+	res, err := m.client.Post(m.Message)
 	if err != nil {
 		return nil, err
 	}

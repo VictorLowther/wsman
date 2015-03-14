@@ -37,7 +37,7 @@ func NewClient(target, username, password string) *Client {
 	return res
 }
 
-func (c *Client) post(msg *soap.Message) (response *soap.Message, err error) {
+func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	req, err := http.NewRequest("POST", c.target, msg.Reader())
 	if err != nil {
 		return nil, err
@@ -69,5 +69,5 @@ func (c *Client) post(msg *soap.Message) (response *soap.Message, err error) {
 func (c *Client) Identify() (*soap.Message, error) {
 	message := soap.NewMessage()
 	message.SetBody(dom.Elem("Identify", NS_WSMID))
-	return c.post(message)
+	return c.Post(message)
 }
