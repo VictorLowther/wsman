@@ -53,6 +53,10 @@ func NewClient(target, username, password string) *Client {
 	return res
 }
 
+func (c *Client) Endpoint() string {
+	return c.target
+}
+
 func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	req, err := http.NewRequest("POST", c.target, msg.Reader())
 	if err != nil {
