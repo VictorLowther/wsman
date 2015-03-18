@@ -17,6 +17,7 @@ limitations under the License.
 */
 
 import (
+	"errors"
 	"fmt"
 	"github.com/VictorLowther/simplexml/dom"
 	"github.com/VictorLowther/soap"
@@ -186,5 +187,9 @@ func (m *Message) Send() (*Message, error) {
 	if msg.replyHelper != nil {
 		err = msg.replyHelper(m, msg)
 	}
+	if msg.Fault() != nil {
+		return msg, errors.New("SOAP Fault")
+	}
 	return msg, nil
+
 }
