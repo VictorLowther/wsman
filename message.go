@@ -125,6 +125,14 @@ func (m *Message) Options(opts ...string) *Message {
 	return m
 }
 
+func (m *Message) GHC(field string) (string, error) {
+	h := m.GetHeader(dom.Elem(field, NS_WSA))
+	if h == nil {
+		return "", fmt.Errorf("Message has no header %s", field)
+	}
+	return string(h.Content), nil
+}
+
 func (m *Message) ResourceURI(resource string) *Message {
 	m.SetHeader(Resource(resource))
 	return m
@@ -154,11 +162,10 @@ func (m *Message) Parameters(args ...string) *Message {
 	if len(args)%2 != 0 {
 		panic("message.Selectors passed an odd number of args!")
 	}
-	resource := m.GetHeader(dom.Elem("Action", NS_WSA))
-	if resource == nil {
-		panic("message has no Action")
+	resourceNS, err := m.GHC("Action")
+	if err != nil {
+		panic(err.Error())
 	}
-	resourceNS := string(resource.Content)
 	idx := strings.LastIndex(resourceNS, "/")
 	if idx == -1 {
 		panic("Action is malformed!")
@@ -191,5 +198,4 @@ func (m *Message) Send() (*Message, error) {
 		return msg, errors.New("SOAP Fault")
 	}
 	return msg, nil
-
 }

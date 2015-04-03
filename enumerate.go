@@ -80,3 +80,15 @@ func (client *Client) Enumerate(resource string) *Message {
 func (client *Client) EnumerateEPR(resource string) *Message {
 	return client.Enumerate(resource).Options("EnumerationMode", "EnumerateEPR")
 }
+
+func (m *Message) EnumItems() ([]*dom.Element, error) {
+	action, err := m.GHC("Action")
+	if err != nil || action != ENUMERATE+"Response" {
+		return nil, fmt.Errorf("Not an EnumerateResponse message!")
+	}
+	items := search.First(search.Tag("Items", NS_WSMAN), m.AllBodyElements())
+	if items == nil {
+		return nil, fmt.Errorf("No items returned from EnumItems")
+	}
+	return items.Children(), nil
+}

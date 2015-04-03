@@ -16,6 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import (
+	"fmt"
+	"github.com/VictorLowther/simplexml/dom"
+	"github.com/VictorLowther/simplexml/search"
+	"path"
+	"strings"
+)
+
 // Invoke creates a wsman.Message that will invoke method on resource.
 // After creating the Message, you need to add the appropriate selectors
 // with msg.Selectors(), and the appropriate parameters with msg.Parameters()
@@ -23,10 +31,47 @@ func (c *Client) Invoke(resource, method string) *Message {
 	return c.NewMessage(resource + "/" + method).ResourceURI(resource)
 }
 
+func (m *Message) InvokeResponse() (*dom.Element, string, error) {
+	action, err := m.GHC("Action")
+	if err != nil {
+		return nil, "", err
+	}
+	method, resource := path.Split(strings.TrimSuffix(action, "Response"))
+	retbody := search.First(search.Tag(method+"_OUTPUT", resource), m.Body())
+	if retbody == nil {
+		return nil, "", fmt.Errorf("No %s_OUTPUT section in response", method)
+	}
+	returnValue := ""
+	retval := search.First(search.Tag("ReturnValue", resource), retbody.Children())
+	if retval == nil {
+		return retbody, "", fmt.Errorf("No ReturnValue in %s_OUTPUT", method)
+	}
+	returnValue = string(retval.Content)
+	return retbody, returnValue, nil
+}
+
 // Get creates a wsman.Message that will get an instance
 // at the passed-in resource.
 func (c *Client) Get(resource string) *Message {
 	return c.NewMessage(GET).ResourceURI(resource)
+}
+
+func (m *Message) GetItem() (*dom.Element, error) {
+	action, err := m.GHC("Action")
+	if err != nil {
+		return nil, err
+	}
+	if action != GET+"Response" {
+		return nil, fmt.Errorf("Not a GetResponse message")
+	}
+	if err != nil {
+		return nil, err
+	}
+	b := m.Body()
+	if len(b) == 0 {
+		return nil, fmt.Errorf("No SOAP body elements")
+	}
+	return b[0], nil
 }
 
 // Put creates a wsman.Message that will update the passed-in

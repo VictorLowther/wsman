@@ -19,8 +19,8 @@ limitations under the License.
 import (
 	"flag"
 	"fmt"
-	"github.com/VictorLowther/wsman"
 	"github.com/VictorLowther/simplexml/dom"
+	"github.com/VictorLowther/wsman"
 	"log"
 	"os"
 	"strings"
@@ -79,7 +79,7 @@ func handleSlice(p string) []string {
 func getStdin(meth string) *dom.Element {
 	doc, err := dom.Parse(os.Stdin)
 	if err != nil {
-		log.Printf("Failed to parse XML doc on stdin: %v\n",err)
+		log.Printf("Failed to parse XML doc on stdin: %v\n", err)
 		os.Exit(argError)
 	}
 	if doc.Root() == nil {
