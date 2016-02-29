@@ -19,11 +19,12 @@ limitations under the License.
 import (
 	"flag"
 	"fmt"
-	"github.com/VictorLowther/simplexml/dom"
-	"github.com/VictorLowther/wsman"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/VictorLowther/simplexml/dom"
+	"github.com/VictorLowther/wsman"
 )
 
 const (
@@ -34,12 +35,14 @@ const (
 )
 
 var Endpoint, Username, Password, Action, Method, ResourceURI string
+var useDigest bool
 var selStr, optStr, paramStr string
 
 func init() {
 	flag.StringVar(&Endpoint, "e", "", "The WSMAN endpoint to communicate with. Right now, only URLs are accepted.")
 	flag.StringVar(&Username, "u", "", "The username to authenticate with")
 	flag.StringVar(&Password, "p", "", "The password to authenticate with")
+	flag.BoolVar(&useDigest, "d", false, "Use digest authentication instead of basic auth")
 	flag.StringVar(&Action, "a", "Identify", `The WSMAN Action to perform. Can be one of :
       Identify
       Enumerate
@@ -103,7 +106,7 @@ func main() {
 		fmt.Printf("%v", flag.Args())
 		os.Exit(argError)
 	}
-	client := wsman.NewClient(Endpoint, Username, Password)
+	client := wsman.NewClient(Endpoint, Username, Password, useDigest)
 	var msg *wsman.Message
 	if Action == "Identify" {
 		reply, err := client.Identify()
