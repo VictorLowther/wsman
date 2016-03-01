@@ -113,16 +113,32 @@ func (c *Client) NewMessage(action string) (msg *Message) {
 //
 // Why not use a map?  Because that would make it much more painful to handle
 // arrays, and I am not that interested in adding evem more magic.
+
+func (m *Message) MakeOption(name string) *dom.Element {
+	return dom.Elem("Option", NS_WSMAN).Attr("Name", "", name)
+}
+
+func (m *Message) AddOption(options ...*dom.Element) *Message {
+	optset := dom.Elem("OptionSet", NS_WSMAN)
+	if found := m.GetHeader(optset); found != nil {
+		optset = found
+	} else {
+		m.SetHeader(optset)
+	}
+	optset.AddChildren(options...)
+	return m
+}
+
 func (m *Message) Options(opts ...string) *Message {
 	if len(opts)%2 != 0 {
 		panic("message.Options passed an odd number of args!")
 	}
-	optset := dom.Elem("OptionSet", NS_WSMAN)
+	options := make([]*dom.Element, len(opts)/2)
 	for i := 0; i < len(opts); i += 2 {
-		elem := dom.ElemC("Option", NS_WSMAN, opts[i+1]).Attr("Name", "", opts[i])
-		optset.AddChild(elem)
+		options[i/2] = m.MakeOption(opts[i])
+		options[i/2].Content = []byte(opts[i+1])
 	}
-	m.SetHeader(optset)
+	m.AddOption(options...)
 	return m
 }
 
@@ -139,6 +155,21 @@ func (m *Message) ResourceURI(resource string) *Message {
 	return m
 }
 
+func (m *Message) MakeSelector(name string) *dom.Element {
+	return dom.Elem("Selector", NS_WSMAN).Attr("Name", "", name)
+}
+
+func (m *Message) AddSelector(selector ...*dom.Element) *Message {
+	selset := dom.Elem("SelectorSet", NS_WSMAN)
+	if found := m.GetHeader(selset); found != nil {
+		selset = found
+	} else {
+		m.SetHeader(selset)
+	}
+	selset.AddChildren(selector...)
+	return m
+}
+
 // Selectors are used to target the resource that Get, Put, and Invoke
 // should work with.  They work like Options does, except they add a SelectorSet
 // element with Selectors instead of Options.
@@ -146,12 +177,12 @@ func (m *Message) Selectors(args ...string) *Message {
 	if len(args)%2 != 0 {
 		panic("message.Selectors passed an odd number of args!")
 	}
-	selset := dom.Elem("SelectorSet", NS_WSMAN)
+	selectors := make([]*dom.Element, len(args)/2)
 	for i := 0; i < len(args); i += 2 {
-		elem := dom.ElemC("Selector", NS_WSMAN, args[i+1]).Attr("Name", "", args[i])
-		selset.AddChild(elem)
+		selectors[i/2] = m.MakeSelector(args[i])
+		selectors[i/2].Content = []byte(args[i+1])
 	}
-	m.SetHeader(selset)
+	m.AddSelector(selectors...)
 	return m
 }
 
@@ -159,10 +190,8 @@ func (m *Message) Selectors(args ...string) *Message {
 // It takes an even number of strings, which should be key:value pairs.
 // It works alot like Options, except it adds the parameters to the Body
 // in the format that WSMAN expects parameter elements to be in.
-func (m *Message) Parameters(args ...string) *Message {
-	if len(args)%2 != 0 {
-		panic("message.Selectors passed an odd number of args!")
-	}
+
+func (m *Message) paramNamespace() (psetNamespace, psetName string) {
 	resourceNS, err := m.GHC("Action")
 	if err != nil {
 		panic(err.Error())
@@ -174,12 +203,36 @@ func (m *Message) Parameters(args ...string) *Message {
 	resourceName := fmt.Sprintf("%s_INPUT", resourceNS[idx+1:])
 	resourceNS = resourceNS[:idx]
 
+	return resourceNS, resourceName
+}
+
+func (m *Message) MakeParameter(name string) *dom.Element {
+	resourceNS, _ := m.paramNamespace()
+	return dom.Elem(name, resourceNS)
+}
+
+func (m *Message) AddParameter(parameters ...*dom.Element) *Message {
+	resourceNS, resourceName := m.paramNamespace()
 	paramSet := dom.Elem(resourceName, resourceNS)
-	for i := 0; i < len(args); i += 2 {
-		elem := dom.ElemC(args[i], resourceNS, args[i+1])
-		paramSet.AddChild(elem)
+	if found := m.GetBody(paramSet); found != nil {
+		paramSet = found
+	} else {
+		m.SetBody(paramSet)
 	}
-	m.SetBody(paramSet)
+	paramSet.AddChildren(parameters...)
+	return m
+}
+
+func (m *Message) Parameters(args ...string) *Message {
+	if len(args)%2 != 0 {
+		panic("message.Selectors passed an odd number of args!")
+	}
+	params := make([]*dom.Element, len(args)/2)
+	for i := 0; i < len(args); i += 2 {
+		params[i/2] = m.MakeParameter(args[i])
+		params[i/2].Content = []byte(args[i+1])
+	}
+	m.AddParameter(params...)
 	return m
 }
 
