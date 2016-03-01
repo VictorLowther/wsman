@@ -19,10 +19,11 @@ limitations under the License.
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/VictorLowther/simplexml/dom"
 	"github.com/VictorLowther/soap"
 	uuid "github.com/satori/go.uuid"
-	"strings"
 )
 
 // Message represents WSMAN messages
@@ -190,9 +191,9 @@ func (m *Message) Send() (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	msg := &Message{Message: res}
-	if msg.replyHelper != nil {
-		err = msg.replyHelper(m, msg)
+	msg := &Message{Message: res, client: m.client}
+	if m.replyHelper != nil {
+		err = m.replyHelper(m, msg)
 	}
 	if msg.Fault() != nil {
 		return msg, errors.New("SOAP Fault")

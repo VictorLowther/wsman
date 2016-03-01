@@ -35,7 +35,7 @@ const (
 )
 
 var Endpoint, Username, Password, Action, Method, ResourceURI string
-var useDigest bool
+var useDigest, debug, optimizeEnum bool
 var selStr, optStr, paramStr string
 
 func init() {
@@ -43,6 +43,7 @@ func init() {
 	flag.StringVar(&Username, "u", "", "The username to authenticate with")
 	flag.StringVar(&Password, "p", "", "The password to authenticate with")
 	flag.BoolVar(&useDigest, "d", false, "Use digest authentication instead of basic auth")
+	flag.BoolVar(&debug, "D", false, "Run the WSMAN client in debug mode")
 	flag.StringVar(&Action, "a", "Identify", `The WSMAN Action to perform. Can be one of :
       Identify
       Enumerate
@@ -53,6 +54,7 @@ func init() {
       Delete
       Invoke
       Any URL for a custom WSMAN Action`)
+	flag.BoolVar(&optimizeEnum, "q", false, "Optimize returning items from an Emumerate or EnumerateEPR")
 	flag.StringVar(&ResourceURI, "r", "", "The ResourceURI for the action")
 	flag.StringVar(&Method, "m", "", "The method to invoke if the action is Invoke")
 	flag.StringVar(&selStr, "s", "", "The comma-seperated list of selector:value pairs")
@@ -107,6 +109,8 @@ func main() {
 		os.Exit(argError)
 	}
 	client := wsman.NewClient(Endpoint, Username, Password, useDigest)
+	client.Debug = debug
+	client.OptimizeEnum = optimizeEnum
 	var msg *wsman.Message
 	if Action == "Identify" {
 		reply, err := client.Identify()

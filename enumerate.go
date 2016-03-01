@@ -18,6 +18,7 @@ limitations under the License.
 
 import (
 	"fmt"
+
 	"github.com/VictorLowther/simplexml/dom"
 	"github.com/VictorLowther/simplexml/search"
 )
@@ -32,20 +33,39 @@ func (c *Client) enumRelease(context *dom.Element) {
 
 func enumHelper(firstreq, resp *Message) error {
 	searchContext := search.Tag("EnumerationContext", NS_WSMEN)
+	searchEnd := search.Tag("EndOfSequence", NS_WSMAN)
+	if search.First(searchEnd, resp.AllBodyElements()) != nil {
+		return nil
+	}
 	context := search.First(searchContext, resp.AllBodyElements())
 	items := search.First(search.Tag("Items", "*"), resp.AllBodyElements())
 	resource := firstreq.GetHeader(dom.Elem("ResourceURI", NS_WSMAN))
-	maxElem := dom.ElemC("MaxElements", NS_WSMAN, "100")
+	maxElem := search.First(search.Tag("MaxElements", NS_WSMAN), firstreq.AllBodyElements())
+	enumEpr := search.First(search.Tag("EnumerationMode", NS_WSMAN), firstreq.AllBodyElements())
 	if resource == nil {
 		return fmt.Errorf("WSMAN Enumerate request did not have RequestURI")
 	}
+	if items == nil {
+		enumResp := search.First(search.Tag("EnumerateResponse", "*"), resp.AllBodyElements())
+		if enumResp == nil {
+			return fmt.Errorf("Enumeration response did not have EnumerateResponse body element")
+		}
+		items = dom.Elem("Items", NS_WSMAN)
+		enumResp.AddChild(items)
+	}
+
 	for context != nil {
 		req := resp.client.NewMessage(PULL)
 		req.SetHeader(resource)
 		body := dom.Elem("Pull", NS_WSMEN)
 		req.SetBody(body)
-		body.AddChild(maxElem)
 		body.AddChild(context)
+		if maxElem != nil {
+			body.AddChild(maxElem)
+		}
+		if enumEpr != nil {
+			body.AddChild(enumEpr)
+		}
 		nextResp, err := req.Send()
 		if err != nil {
 			resp.client.enumRelease(context)
@@ -56,29 +76,43 @@ func enumHelper(firstreq, resp *Message) error {
 		if extraItems != nil {
 			items.AddChildren(extraItems.Children()...)
 		}
+		if search.First(searchEnd, nextResp.AllBodyElements()) != nil {
+			break
+		}
 	}
 	return nil
+}
+
+func (c *Client) enumerate(resource string, epr, optimize bool) *Message {
+	req := c.NewMessage(ENUMERATE).ResourceURI(resource)
+	body := dom.Elem("Enumerate", NS_WSMEN)
+	req.SetBody(body)
+	if optimize {
+		optimizeEnum := dom.Elem("OptimizeEnumeration", NS_WSMAN)
+		maxElem := dom.ElemC("MaxElements", NS_WSMAN, "100")
+		maxElem.Content = []byte("100")
+		body.AddChildren(optimizeEnum, maxElem)
+	}
+	if epr {
+		enumEpr := dom.Elem("EnumerationMode", NS_WSMAN)
+		enumEpr.Content = []byte("EnumerateEPR")
+		body.AddChild(enumEpr)
+	}
+	req.replyHelper = enumHelper
+	return req
 }
 
 // Enumerate creates a wsman.Message that will enumerate all the objects
 // available at resource.  If there are many objects, it will arrange
 // for the appropriate series of wsman Pull calls to be performed, so you can
 // be certian that the response to this message has all the objects you specify.
-func (client *Client) Enumerate(resource string) *Message {
-	req := client.NewMessage(ENUMERATE).ResourceURI(resource)
-	body := dom.Elem("Enumerate", NS_WSMEN)
-	req.SetBody(body)
-	optimizeEnum := dom.Elem("OptimizeEnumeration", NS_WSMAN)
-	maxElem := dom.ElemC("MaxElements", NS_WSMAN, "100")
-	maxElem.Content = []byte("100")
-	body.AddChildren(optimizeEnum, maxElem)
-	req.replyHelper = enumHelper
-	return req
+func (c *Client) Enumerate(resource string) *Message {
+	return c.enumerate(resource, false, c.OptimizeEnum)
 }
 
 // EnumerateEPR creates a message that will enumerate the endpoints for a given resource.
-func (client *Client) EnumerateEPR(resource string) *Message {
-	return client.Enumerate(resource).Options("EnumerationMode", "EnumerateEPR")
+func (c *Client) EnumerateEPR(resource string) *Message {
+	return c.enumerate(resource, true, c.OptimizeEnum)
 }
 
 func (m *Message) EnumItems() ([]*dom.Element, error) {

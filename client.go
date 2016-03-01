@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -160,9 +161,9 @@ func (c *challenge) parseChallenge(input string) error {
 // Client is a thin wrapper around http.Client.
 type Client struct {
 	http.Client
-	target, username, password string
-	useDigest                  bool
-	challenge                  *challenge
+	target, username, password     string
+	useDigest, Debug, OptimizeEnum bool
+	challenge                      *challenge
 }
 
 // NewClient creates a new wsman.Client.
@@ -181,6 +182,19 @@ func NewClient(target, username, password string, useDigest bool) *Client {
 	res.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
+	if res.useDigest {
+		res.challenge = &challenge{Username: res.username, Password: res.password}
+		resp, err := res.PostForm(res.target, nil)
+		if err != nil {
+			log.Fatalf("Unable to perform digest auth with %s: %v", res.target, err)
+		}
+		if resp.StatusCode != 401 {
+			log.Fatalf("No digest auth at %s", res.target)
+		}
+		if err := res.challenge.parseChallenge(resp.Header.Get("WWW-Authenticate")); err != nil {
+			log.Fatalf("Failed to parse auth header %v", err)
+		}
+	}
 	return res
 }
 
@@ -193,16 +207,27 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if c.username != "" && c.password != "" && !c.useDigest {
-		req.SetBasicAuth(c.username, c.password)
+	if c.username != "" && c.password != "" {
+		if c.useDigest {
+			auth, err := c.challenge.authorize("POST", c.target)
+			if err != nil {
+				return nil, fmt.Errorf("Failed digest auth %v", err)
+			}
+			req.Header.Set("Authorization", auth)
+		} else {
+			req.SetBasicAuth(c.username, c.password)
+		}
 	}
 	req.Header.Add("content-type", soap.ContentType)
+	if c.Debug {
+		log.Printf("req:%#v\nbody:\n%s\n", req, msg.String())
+	}
 	res, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if c.useDigest && res.StatusCode == 401 {
-		c.challenge = &challenge{Username: c.username, Password: c.password}
+		log.Printf("Digest reauthorizing")
 		if err := c.challenge.parseChallenge(res.Header.Get("WWW-Authenticate")); err != nil {
 			return nil, err
 		}
@@ -231,6 +256,9 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	response, err = soap.Parse(res.Body)
 	if err != nil {
 		return nil, err
+	}
+	if c.Debug {
+		log.Printf("res: %#v\nbody:\n%s\n", res, response.String())
 	}
 	return response, nil
 }
