@@ -168,9 +168,11 @@ type Client struct {
 
 // NewClient creates a new wsman.Client.
 //
-// target must be a URL, and username and password must be
-// the username and password to authenticate to the controller with.
-// If username or password are empty, we will not try to authenticate.
+// target must be a URL, and username and password must be the
+// username and password to authenticate to the controller with.  If
+// username or password are empty, we will not try to authenticate.
+// If useDigest is true, we will try to use digest auth instead of
+// basic auth.
 func NewClient(target, username, password string, useDigest bool) *Client {
 	res := &Client{
 		target:    target,
@@ -198,10 +200,13 @@ func NewClient(target, username, password string, useDigest bool) *Client {
 	return res
 }
 
+// Endpoint returns the endpoint that the Client will try to ocmmunicate with.
 func (c *Client) Endpoint() string {
 	return c.target
 }
 
+// Post overrides http.Client's Post method and adds digext auth handling
+// and SOAP pre and post processing.
 func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	req, err := http.NewRequest("POST", c.target, msg.Reader())
 	if err != nil {

@@ -114,10 +114,14 @@ func (c *Client) NewMessage(action string) (msg *Message) {
 // Why not use a map?  Because that would make it much more painful to handle
 // arrays, and I am not that interested in adding evem more magic.
 
+// MakeOption makes an element that can be added as an option to the
+// message header with AddOption.
 func (m *Message) MakeOption(name string) *dom.Element {
 	return dom.Elem("Option", NS_WSMAN).Attr("Name", "", name)
 }
 
+// AddOption adds any number of elements (created with MakeOption) to
+// the message header.
 func (m *Message) AddOption(options ...*dom.Element) *Message {
 	optset := dom.Elem("OptionSet", NS_WSMAN)
 	if found := m.GetHeader(optset); found != nil {
@@ -129,6 +133,8 @@ func (m *Message) AddOption(options ...*dom.Element) *Message {
 	return m
 }
 
+// Options is a fast way of creating options that are basically
+// key/value pairs
 func (m *Message) Options(opts ...string) *Message {
 	if len(opts)%2 != 0 {
 		panic("message.Options passed an odd number of args!")
@@ -142,6 +148,7 @@ func (m *Message) Options(opts ...string) *Message {
 	return m
 }
 
+// GHC gets the contents of a specific Header field.
 func (m *Message) GHC(field string) (string, error) {
 	h := m.GetHeader(dom.Elem(field, NS_WSA))
 	if h == nil {
@@ -150,15 +157,20 @@ func (m *Message) GHC(field string) (string, error) {
 	return string(h.Content), nil
 }
 
+// ResourceURI sets the ResourceURI header of the message
 func (m *Message) ResourceURI(resource string) *Message {
 	m.SetHeader(Resource(resource))
 	return m
 }
 
+// MakeSelector makes an element that can be added to the message with
+// AddSelector
 func (m *Message) MakeSelector(name string) *dom.Element {
 	return dom.Elem("Selector", NS_WSMAN).Attr("Name", "", name)
 }
 
+// AddSelector adds any number of elements (created with MakeSelector)
+// to the message.
 func (m *Message) AddSelector(selector ...*dom.Element) *Message {
 	selset := dom.Elem("SelectorSet", NS_WSMAN)
 	if found := m.GetHeader(selset); found != nil {
@@ -186,11 +198,6 @@ func (m *Message) Selectors(args ...string) *Message {
 	return m
 }
 
-// Parameters sets the parameters for an invoke call.
-// It takes an even number of strings, which should be key:value pairs.
-// It works alot like Options, except it adds the parameters to the Body
-// in the format that WSMAN expects parameter elements to be in.
-
 func (m *Message) paramNamespace() (psetNamespace, psetName string) {
 	resourceNS, err := m.GHC("Action")
 	if err != nil {
@@ -206,11 +213,15 @@ func (m *Message) paramNamespace() (psetNamespace, psetName string) {
 	return resourceNS, resourceName
 }
 
+// MakeParameter makes an element which can be added to the message
+// with AddParameter
 func (m *Message) MakeParameter(name string) *dom.Element {
 	resourceNS, _ := m.paramNamespace()
 	return dom.Elem(name, resourceNS)
 }
 
+// AddParameter adds any number of elements (created with
+// MakeParameter) to the message.
 func (m *Message) AddParameter(parameters ...*dom.Element) *Message {
 	resourceNS, resourceName := m.paramNamespace()
 	paramSet := dom.Elem(resourceName, resourceNS)
@@ -223,6 +234,10 @@ func (m *Message) AddParameter(parameters ...*dom.Element) *Message {
 	return m
 }
 
+// Parameters sets the parameters for an invoke call.
+// It takes an even number of strings, which should be key:value pairs.
+// It works alot like Options, except it adds the parameters to the Body
+// in the format that WSMAN expects parameter elements to be in.
 func (m *Message) Parameters(args ...string) *Message {
 	if len(args)%2 != 0 {
 		panic("message.Selectors passed an odd number of args!")
