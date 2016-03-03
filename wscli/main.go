@@ -35,7 +35,7 @@ const (
 )
 
 var Endpoint, Username, Password, Action, Method, ResourceURI string
-var useDigest, debug, optimizeEnum bool
+var useDigest, debug, optimizeEnum, useStdin bool
 var selStr, optStr, paramStr string
 
 func init() {
@@ -55,6 +55,7 @@ func init() {
       Invoke
       Any URL for a custom WSMAN Action`)
 	flag.BoolVar(&optimizeEnum, "q", false, "Optimize returning items from an Emumerate or EnumerateEPR")
+	flag.BoolVar(&useStdin, "i", false, "Read body of request from stdin")
 	flag.StringVar(&ResourceURI, "r", "", "The ResourceURI for the action")
 	flag.StringVar(&Method, "m", "", "The method to invoke if the action is Invoke")
 	flag.StringVar(&selStr, "s", "", "The comma-seperated list of selector:value pairs")
@@ -81,14 +82,10 @@ func handleSlice(p string) []string {
 	return res
 }
 
-func getStdin(meth string) *dom.Element {
+func getStdin() *dom.Element {
 	doc, err := dom.Parse(os.Stdin)
 	if err != nil {
 		log.Printf("Failed to parse XML doc on stdin: %v\n", err)
-		os.Exit(argError)
-	}
-	if doc.Root() == nil {
-		log.Printf("%s needs an XML document on stdin\n", meth)
 		os.Exit(argError)
 	}
 	return doc.Root()
@@ -99,7 +96,6 @@ func main() {
 	Selectors := handleSlice(selStr)
 	Options := handleSlice(optStr)
 	Parameters := handleSlice(paramStr)
-	var Body *dom.Element
 	if Endpoint == "" || Action == "" {
 		flag.Usage()
 		os.Exit(argError)
@@ -134,10 +130,8 @@ func main() {
 		msg = client.Get(ResourceURI)
 	case "Put":
 		msg = client.Put(ResourceURI)
-		Body = getStdin(Action)
 	case "Create":
 		msg = client.Create(ResourceURI)
-		Body = getStdin(Action)
 	case "Delete":
 		msg = client.Delete(ResourceURI)
 	case "Invoke":
@@ -159,10 +153,14 @@ func main() {
 		msg.Selectors(Selectors...)
 	}
 	if len(Parameters) > 0 {
-		msg.Parameters(Parameters...)
+		if Action == "Put" {
+			msg.Values(Parameters...)
+		} else {
+			msg.Parameters(Parameters...)
+		}
 	}
-	if Body != nil {
-		msg.SetBody(Body)
+	if useStdin {
+		msg.SetBody(getStdin())
 	}
 	reply, err := msg.Send()
 	if err != nil {

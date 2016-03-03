@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/VictorLowther/simplexml/dom"
+	"github.com/VictorLowther/simplexml/search"
 	"github.com/VictorLowther/soap"
 	uuid "github.com/satori/go.uuid"
 )
@@ -248,6 +249,49 @@ func (m *Message) Parameters(args ...string) *Message {
 		params[i/2].Content = []byte(args[i+1])
 	}
 	m.AddParameter(params...)
+	return m
+}
+
+func (m *Message) GetResource() string {
+	hdr := search.First(search.Tag("ResourceURI", NS_WSMAN), m.AllHeaderElements())
+	if hdr == nil {
+		panic("No ResourceURI")
+	}
+	return string(hdr.Content)
+}
+
+// MakeValue makes an element that can be used to set a new instance value for a Put call
+func (m *Message) MakeValue(name string) *dom.Element {
+	ns := m.GetResource()
+	return dom.Elem(name, ns)
+}
+
+func (m *Message) AddValue(values ...*dom.Element) *Message {
+	ns := m.GetResource()
+	idx := strings.LastIndex(ns, `/`)
+	if idx == -1 {
+		panic("Resource is malformed")
+	}
+	valueSet := dom.Elem(ns[idx+1:], ns)
+	if found := m.GetBody(valueSet); found != nil {
+		valueSet = found
+	} else {
+		m.SetBody(valueSet)
+	}
+	valueSet.AddChildren(values...)
+	return m
+}
+
+func (m *Message) Values(args ...string) *Message {
+	if len(args)%2 != 0 {
+		panic("message.Values passed an odd number of args")
+	}
+	values := make([]*dom.Element, len(args)/2)
+	for i := 0; i < len(args); i += 2 {
+		values[i/2] = m.MakeValue(args[i])
+		values[i/2].Content = []byte(args[i+1])
+	}
+	m.AddValue(values...)
 	return m
 }
 
