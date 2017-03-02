@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/VictorLowther/simplexml/dom"
 	"github.com/VictorLowther/wsman"
@@ -37,6 +38,7 @@ const (
 var Endpoint, Username, Password, Action, Method, ResourceURI string
 var useDigest, debug, optimizeEnum, useStdin bool
 var selStr, optStr, paramStr string
+var timeout int64
 
 func init() {
 	flag.StringVar(&Endpoint, "e", "", "The WSMAN endpoint to communicate with. Right now, only URLs are accepted.")
@@ -61,6 +63,7 @@ func init() {
 	flag.StringVar(&selStr, "s", "", "The comma-seperated list of selector:value pairs")
 	flag.StringVar(&optStr, "o", "", "The comma-seperated set of WSMAN option:value pairs")
 	flag.StringVar(&paramStr, "x", "", "The comma-seperated list of parameter:value pairs for Invoke actions")
+	flag.Int64Var(&timeout, "t", 60, "The number of seconds to wait for a response from the WSMAN endpoint")
 }
 
 func handleSlice(p string) []string {
@@ -107,6 +110,7 @@ func main() {
 	client := wsman.NewClient(Endpoint, Username, Password, useDigest)
 	client.Debug = debug
 	client.OptimizeEnum = optimizeEnum
+	client.Timeout = (time.Duration(timeout) * time.Second)
 	var msg *wsman.Message
 	if Action == "Identify" {
 		reply, err := client.Identify()
