@@ -118,7 +118,7 @@ func (c *challenge) authorize(method, uri string) (string, error) {
 		sl = append(sl, fmt.Sprintf("nc=%08x", c.NonceCount))
 		sl = append(sl, fmt.Sprintf(`cnonce="%s"`, c.Cnonce))
 	}
-	return fmt.Sprintf("Digest %s", strings.Join(sl, ", ")), nil
+	return fmt.Sprintf("Digest %s", strings.Join(sl, ",")), nil
 }
 
 // origin https://code.google.com/p/mlab-ns2/source/browse/gae/ns/digest/digest.go#90
