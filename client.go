@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -118,7 +119,7 @@ func (c *challenge) authorize(method, uri string) (string, error) {
 		sl = append(sl, fmt.Sprintf("nc=%08x", c.NonceCount))
 		sl = append(sl, fmt.Sprintf(`cnonce="%s"`, c.Cnonce))
 	}
-	return fmt.Sprintf("Digest %s", strings.Join(sl, ", ")), nil
+	return fmt.Sprintf("Digest %s", strings.Join(sl, ",")), nil
 }
 
 // origin https://code.google.com/p/mlab-ns2/source/browse/gae/ns/digest/digest.go#90
@@ -161,7 +162,8 @@ func (c *challenge) parseChallenge(input string) error {
 // Client is a thin wrapper around http.Client.
 type Client struct {
 	http.Client
-	target, username, password     string
+	target, targetPath             string
+	username, password             string
 	useDigest, Debug, OptimizeEnum bool
 	challenge                      *challenge
 }
@@ -173,12 +175,17 @@ type Client struct {
 // username or password are empty, we will not try to authenticate.
 // If useDigest is true, we will try to use digest auth instead of
 // basic auth.
-func NewClient(target, username, password string, useDigest bool) *Client {
+func NewClient(target, username, password string, useDigest bool) (*Client, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse target as url %v", err)
+	}
 	res := &Client{
-		target:    target,
-		username:  username,
-		password:  password,
-		useDigest: useDigest,
+		target:     target,
+		targetPath: u.Path,
+		username:   username,
+		password:   password,
+		useDigest:  useDigest,
 	}
 	res.Timeout = 10 * time.Second
 	res.Transport = &http.Transport{
@@ -188,16 +195,16 @@ func NewClient(target, username, password string, useDigest bool) *Client {
 		res.challenge = &challenge{Username: res.username, Password: res.password}
 		resp, err := res.PostForm(res.target, nil)
 		if err != nil {
-			log.Fatalf("Unable to perform digest auth with %s: %v", res.target, err)
+			return nil, fmt.Errorf("Unable to perform digest auth with %s: %v", res.target, err)
 		}
 		if resp.StatusCode != 401 {
-			log.Fatalf("No digest auth at %s", res.target)
+			return nil, fmt.Errorf("No digest auth at %s", res.target)
 		}
 		if err := res.challenge.parseChallenge(resp.Header.Get("WWW-Authenticate")); err != nil {
-			log.Fatalf("Failed to parse auth header %v", err)
+			return nil, fmt.Errorf("Failed to parse auth header %v", err)
 		}
 	}
-	return res
+	return res, nil
 }
 
 // Endpoint returns the endpoint that the Client will try to ocmmunicate with.
@@ -214,7 +221,7 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	}
 	if c.username != "" && c.password != "" {
 		if c.useDigest {
-			auth, err := c.challenge.authorize("POST", c.target)
+			auth, err := c.challenge.authorize("POST", c.targetPath)
 			if err != nil {
 				return nil, fmt.Errorf("Failed digest auth %v", err)
 			}
@@ -232,11 +239,13 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 		return nil, err
 	}
 	if c.useDigest && res.StatusCode == 401 {
-		log.Printf("Digest reauthorizing")
+		if c.Debug {
+			log.Printf("Digest reauthorizing")
+		}
 		if err := c.challenge.parseChallenge(res.Header.Get("WWW-Authenticate")); err != nil {
 			return nil, err
 		}
-		auth, err := c.challenge.authorize("POST", c.target)
+		auth, err := c.challenge.authorize("POST", c.targetPath)
 		if err != nil {
 			return nil, fmt.Errorf("Failed digest auth %v", err)
 		}
