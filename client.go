@@ -236,7 +236,9 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 		return nil, err
 	}
 	if c.useDigest && res.StatusCode == 401 {
-		log.Printf("Digest reauthorizing")
+		if c.Debug {
+			log.Printf("Digest reauthorizing")
+		}
 		if err := c.challenge.parseChallenge(res.Header.Get("WWW-Authenticate")); err != nil {
 			return nil, err
 		}
