@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -161,7 +162,8 @@ func (c *challenge) parseChallenge(input string) error {
 // Client is a thin wrapper around http.Client.
 type Client struct {
 	http.Client
-	target, username, password     string
+	target, targetPath             string
+	username, password             string
 	useDigest, Debug, OptimizeEnum bool
 	challenge                      *challenge
 }
@@ -179,10 +181,11 @@ func NewClient(target, username, password string, useDigest bool) (*Client, erro
 		return nil, fmt.Errorf("failed to parse target as url %v", err)
 	}
 	res := &Client{
-		target:    target,
-		username:  username,
-		password:  password,
-		useDigest: useDigest,
+		target:     target,
+		targetPath: u.Path,
+		username:   username,
+		password:   password,
+		useDigest:  useDigest,
 	}
 	res.Timeout = 10 * time.Second
 	res.Transport = &http.Transport{
@@ -218,7 +221,7 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 	}
 	if c.username != "" && c.password != "" {
 		if c.useDigest {
-			auth, err := c.challenge.authorize("POST", c.target)
+			auth, err := c.challenge.authorize("POST", c.targetPath)
 			if err != nil {
 				return nil, fmt.Errorf("Failed digest auth %v", err)
 			}
@@ -242,7 +245,7 @@ func (c *Client) Post(msg *soap.Message) (response *soap.Message, err error) {
 		if err := c.challenge.parseChallenge(res.Header.Get("WWW-Authenticate")); err != nil {
 			return nil, err
 		}
-		auth, err := c.challenge.authorize("POST", c.target)
+		auth, err := c.challenge.authorize("POST", c.targetPath)
 		if err != nil {
 			return nil, fmt.Errorf("Failed digest auth %v", err)
 		}
