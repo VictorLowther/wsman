@@ -107,7 +107,11 @@ func main() {
 		fmt.Printf("%v", flag.Args())
 		os.Exit(argError)
 	}
-	client := wsman.NewClient(Endpoint, Username, Password, useDigest)
+	client, err := wsman.NewClient(Endpoint, Username, Password, useDigest)
+	if err != nil {
+		log.Println(err.Error())
+		os.Exit(argError)
+	}
 	client.Debug = debug
 	client.OptimizeEnum = optimizeEnum
 	client.Timeout = (time.Duration(timeout) * time.Second)
